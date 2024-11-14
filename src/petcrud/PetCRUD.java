@@ -7,7 +7,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import javax.swing.table.DefaultTableModel;
+
 import javax.swing.*;
 import java.awt.*;
 import javax.swing.table.*;
@@ -22,7 +22,7 @@ public class PetCRUD extends JFrame {
     
     private JComboBox<String> comboSexo;
     private JTextField txtBuscar, txtID, txtNome, txtEspecie, txtRaca, txtNascimento, txtCor;
-    private JButton btnBuscar, btnNovo, btnInserir, btnPrimeiro, btnAnterior, btnProximo, btnUltimo;
+    private JButton btnBuscar, btnNovo, btnInserir, btnPrimeiro, btnAnterior, btnProximo, btnUltimo, btnExcluir, btnAlterar;
     private JTable table;
     private DefaultTableModel tableModel;
     
@@ -41,7 +41,7 @@ public class PetCRUD extends JFrame {
         add(lblTitulo);
 
         // Campo de busca
-        txtBuscar = new JTextField("Pesquisar Itens");
+        txtBuscar = new JTextField("Pesquisar por espécie");
         txtBuscar.setBounds(100, 15, 200, 25);
         add(txtBuscar);
 
@@ -111,7 +111,13 @@ public class PetCRUD extends JFrame {
         btnUltimo.setBounds(410, 270, 120, 30);
         add(btnUltimo);
 
+        btnExcluir = new JButton("Excluir");
+        btnExcluir.setBounds(630, 270, 120, 30); // Novo botão Excluir
+        add(btnExcluir);
 
+        btnAlterar = new JButton("Alterar");
+        btnAlterar.setBounds(760, 270, 120, 30); // Novo botão Alterar
+        add(btnAlterar);
 
         JLabel lblNome = new JLabel("Nome:");
         lblNome.setBounds(900, 55, 80, 25);  
@@ -163,32 +169,39 @@ public class PetCRUD extends JFrame {
         txtCor = new JTextField();
         txtCor.setBounds(980, 205, 100, 25);  // Novo valor Y = 205
         add(txtCor);
-
-
-
-
         
         setupListeners();
         updateTable();
     }
-   
+
+    private void setupListeners() {
+        btnNovo.addActionListener(e -> clearForm());
+        btnInserir.addActionListener(e -> insertPet());
+        btnBuscar.addActionListener(e -> searchPets());
+        btnAlterar.addActionListener(e -> handlePetAction("alterar"));
+        btnExcluir.addActionListener(e -> handlePetAction("excluir"));
+        btnPrimeiro.addActionListener(e -> navigateTo("first"));
+        btnAnterior.addActionListener(e -> navigateTo("previous"));
+        btnProximo.addActionListener(e -> navigateTo("next"));
+        btnUltimo.addActionListener(e -> navigateTo("last"));
+    }
     
-    static class ButtonRenderer extends JButton implements TableCellRenderer {
-        private String label;
-        private JTable table;
-
-        public ButtonRenderer(String label, JTable table) {
-            this.label = label;
-            this.table = table; // Passando a tabela
-            setText(label);
-        }
-
-        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-            return this;
+    // Método auxiliar para lidar com a ação de alterar ou excluir pet
+    private void handlePetAction(String action) {
+        int row = table.getSelectedRow();
+        if (row != -1) {
+            int petId = (Integer) table.getValueAt(row, 0);
+            if (action.equals("alterar")) {
+                editPet(petId);  // Chama o método de edição
+            } else if (action.equals("excluir")) {
+                deletePet(petId);  // Chama o método de exclusão
+            }
+        } else {
+            String message = (action.equals("alterar")) ? "Por favor, selecione um pet para alterar." : "Por favor, selecione um pet para excluir.";
+            JOptionPane.showMessageDialog(this, message);
         }
     }
 
-    
     private void deletePet(int petId) {
         int response = JOptionPane.showConfirmDialog(this, "Tem certeza de que deseja excluir este pet?", "Confirmar Exclusão", JOptionPane.YES_NO_OPTION);
         if (response == JOptionPane.YES_OPTION) {
@@ -207,17 +220,6 @@ public class PetCRUD extends JFrame {
     private void editPet(int petId) {
         PetEditDialog editDialog = new PetEditDialog(petId, this);
         editDialog.setVisible(true);  // Tornando o diálogo visível e modal
-    }
-
-    
-    private void setupListeners() {
-        btnNovo.addActionListener(e -> clearForm());
-        btnInserir.addActionListener(e -> insertPet());
-        btnBuscar.addActionListener(e -> searchPets());
-        btnPrimeiro.addActionListener(e -> navigateTo("first"));
-        btnAnterior.addActionListener(e -> navigateTo("previous"));
-        btnProximo.addActionListener(e -> navigateTo("next"));
-        btnUltimo.addActionListener(e -> navigateTo("last"));
     }
     
     // Método para limpar o formulário
@@ -341,8 +343,6 @@ public class PetCRUD extends JFrame {
                         rs.getDate("nascimento"),
                         rs.getString("sexo"),
                         rs.getString("cor"),
-                        "Excluir",  // Texto do botão "Excluir"
-                        "Alterar"   // Texto do botão "Alterar"
                 });
             }
         } catch (SQLException e) {
@@ -351,8 +351,9 @@ public class PetCRUD extends JFrame {
     }
 
 
-    private void navigateTo(String position) {;;;
+    private void navigateTo(String position) {
         int currentIndex = getCurrentIndexFromTable();
+        if (tableModel.getRowCount() == 0) return;  // Se não houver dados, não faz nada
         switch (position) {
             case "first":
                 currentIndex = 0;
@@ -369,6 +370,7 @@ public class PetCRUD extends JFrame {
         }
         selectRow(currentIndex);
     }
+    
     
     private int getCurrentIndexFromTable() {
         return table.getSelectedRow();  // Retorna o índice da linha selecionada
