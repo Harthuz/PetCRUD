@@ -7,7 +7,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import javax.swing.table.DefaultTableModel;
+
 import javax.swing.*;
 import java.awt.*;
 import javax.swing.table.*;
@@ -22,7 +22,7 @@ public class PetCRUD extends JFrame {
     
     private JComboBox<String> comboSexo;
     private JTextField txtBuscar, txtID, txtNome, txtEspecie, txtRaca, txtNascimento, txtCor;
-    private JButton btnBuscar, btnNovo, btnInserir, btnPrimeiro, btnAnterior, btnProximo, btnUltimo;
+    private JButton btnBuscar, btnNovo, btnInserir, btnPrimeiro, btnAnterior, btnProximo, btnUltimo, btnAlterar, btnExcluir;
     private JTable table;
     private DefaultTableModel tableModel;
     
@@ -93,12 +93,6 @@ public class PetCRUD extends JFrame {
         
         // Desabilitar a edição ao clicar ou dar dois cliques
         table.setDefaultEditor(Object.class, null); // Impede edição das células
-        
-        // Adicionar renderizadores e editores de botão nas colunas de "Excluir" e "Alterar"
-        table.getColumn("Excluir").setCellRenderer(new ButtonRenderer("Excluir", table));
-        table.getColumn("Excluir").setCellEditor(new ButtonEditor(table, "Excluir", this)); // 'this' passa a instância de PetCRUD
-        table.getColumn("Alterar").setCellRenderer(new ButtonRenderer("Alterar", table));
-        table.getColumn("Alterar").setCellEditor(new ButtonEditor(table, "Alterar", this)); // 'this' passa a instância de PetCRUD
 
         // Botões de navegação
         btnPrimeiro = new JButton("Primeiro");
@@ -116,6 +110,15 @@ public class PetCRUD extends JFrame {
         btnUltimo = new JButton("Último");
         btnUltimo.setBounds(410, 270, 120, 30);
         add(btnUltimo);
+
+        btnExcluir = new JButton("Excluir");
+        btnExcluir.setBounds(540, 270, 120, 30); // Novo botão Excluir
+        add(btnExcluir);
+
+        btnAlterar = new JButton("Alterar");
+        btnAlterar.setBounds(670, 270, 120, 30); // Novo botão Alterar
+        add(btnAlterar);
+
 
         JLabel lblNome = new JLabel("Nome:");
         lblNome.setBounds(900, 55, 80, 25);  
@@ -167,10 +170,6 @@ public class PetCRUD extends JFrame {
         txtCor = new JTextField();
         txtCor.setBounds(980, 205, 100, 25);  // Novo valor Y = 205
         add(txtCor);
-
-
-
-
         
         setupListeners();
         updateTable();
@@ -253,9 +252,23 @@ public class PetCRUD extends JFrame {
     }
 
     private void editPet(int petId) {
-        PetEditDialog editDialog = new PetEditDialog(petId, this);
-        editDialog.setVisible(true);  // Tornando o diálogo visível e modal
+        String sql = "SELECT * FROM pet WHERE id_pet = ?";
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+            PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, petId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                txtNome.setText(rs.getString("nome"));
+                txtEspecie.setText(rs.getString("especie"));
+                txtRaca.setText(rs.getString("raca"));
+                txtNascimento.setText(rs.getString("nascimento"));
+                txtCor.setText(rs.getString("cor"));
+                comboSexo.setSelectedItem(rs.getString("sexo"));
+            }
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Erro ao carregar dados para edição: " + e.getMessage());
     }
+}
 
     
     private void setupListeners() {
@@ -266,7 +279,32 @@ public class PetCRUD extends JFrame {
         btnAnterior.addActionListener(e -> navigateTo("previous"));
         btnProximo.addActionListener(e -> navigateTo("next"));
         btnUltimo.addActionListener(e -> navigateTo("last"));
+        
+        // Adicionar os novos listeners para os botões Excluir e Alterar
+        btnExcluir.addActionListener(e -> deleteSelectedPet());
+        btnAlterar.addActionListener(e -> editSelectedPet());
     }
+
+    private void deleteSelectedPet() {
+        int row = table.getSelectedRow();
+        if (row >= 0) {
+            int petId = (Integer) table.getValueAt(row, 0);  // Obtemos o ID da linha selecionada
+            deletePet(petId);
+        } else {
+            JOptionPane.showMessageDialog(this, "Selecione uma linha para excluir.");
+        }
+    }
+
+    private void editSelectedPet() {
+        int row = table.getSelectedRow();
+        if (row >= 0) {
+            int petId = (Integer) table.getValueAt(row, 0);  // Obtemos o ID da linha selecionada
+            editPet(petId);
+        } else {
+            JOptionPane.showMessageDialog(this, "Selecione uma linha para alterar.");
+        }
+    }
+
     
     // Método para limpar o formulário
     private void clearForm() {
@@ -279,38 +317,33 @@ public class PetCRUD extends JFrame {
     }    
     
     private void insertPet() {
-        if (formIsValid()) {
-            // Obter ou inserir as normalizações
-            int especieId = getOrInsert("especie", txtEspecie.getText());
-            int racaId = getOrInsert("raca", txtRaca.getText());
-            int corId = getOrInsert("cor", txtCor.getText());
-            int sexoId = getOrInsert("sexo", comboSexo.getSelectedItem().toString()); // Usar o ComboBox para pegar o sexo
-
-            // Verificar se a data de nascimento está no formato correto
-            String nascimento = txtNascimento.getText();
-            if (!isValidDate(nascimento)) {
-                JOptionPane.showMessageDialog(this, "A data de nascimento deve estar no formato AAAA-MM-DD.");
-                return; // Interrompe a inserção, pois a data é inválida
-            }
-
-            // Inserir pet na tabela pet
-            String sql = "INSERT INTO pet (nome, especie, raca, nascimento, sexo, cor) VALUES (?, ?, ?, ?, ?, ?)";
-            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
-                 PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setString(1, txtNome.getText());
-                ps.setInt(2, especieId);
-                ps.setInt(3, racaId);
-                ps.setDate(4, Date.valueOf(nascimento)); // Convertendo a data (já validada)
-                ps.setInt(5, sexoId);
-                ps.setInt(6, corId);
-                ps.executeUpdate();
-                updateTable(); // Atualiza a tabela após inserção
-                clearForm();
-            } catch (SQLException e) {
-                JOptionPane.showMessageDialog(this, "Erro ao inserir pet: " + e.getMessage());
-            }
-        } else {
-            JOptionPane.showMessageDialog(this, "Por favor, preencha todos os campos.");
+        String nome = txtNome.getText();
+        String especie = txtEspecie.getText();
+        String raca = txtRaca.getText();
+        String nascimento = txtNascimento.getText();
+        String sexo = (String) comboSexo.getSelectedItem();
+        String cor = txtCor.getText();
+    
+        if (nome.isEmpty() || especie.isEmpty() || raca.isEmpty() || nascimento.isEmpty() || cor.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Todos os campos devem ser preenchidos.");
+            return;
+        }
+    
+        String sql = "INSERT INTO pets (nome, especie, raca, nascimento, sexo, cor) VALUES (?, ?, ?, ?, ?, ?)";
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, nome);
+            stmt.setString(2, especie);
+            stmt.setString(3, raca);
+            stmt.setString(4, nascimento);
+            stmt.setString(5, sexo);
+            stmt.setString(6, cor);
+            stmt.executeUpdate();
+            JOptionPane.showMessageDialog(this, "Pet inserido com sucesso!");
+            updateTable();
+            clearForm();
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Erro ao inserir o pet: " + e.getMessage());
         }
     }
 
@@ -368,63 +401,51 @@ public class PetCRUD extends JFrame {
 
     
     public void updateTable() {
-        // Limpar e recarregar dados na JTable
-        tableModel.setRowCount(0);
-        String sql =    "SELECT pet.id_pet, pet.nome, especie.especie, raca.raca, pet.nascimento, sexo.sexo, cor.cor \n" +
-                        "FROM pet \n" +
-                        "JOIN especie ON pet.especie = especie.id_especie\n" +
-                        "JOIN raca ON pet.raca = raca.id_raca\n" +
-                        "JOIN sexo ON pet.sexo = sexo.id_sexo\n" +
-                        "JOIN cor ON pet.cor = cor.id_cor;";
+        String sql = "SELECT * FROM pet";
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            tableModel.setRowCount(0);  // Limpar a tabela antes de atualizar
             while (rs.next()) {
-                tableModel.addRow(new Object[]{
-                        rs.getInt("id_pet"),
-                        rs.getString("nome"),
-                        rs.getString("especie"),
-                        rs.getString("raca"),
-                        rs.getDate("nascimento"),
-                        rs.getString("sexo"),
-                        rs.getString("cor"),
-                        "Excluir",  // Texto do botão "Excluir"
-                        "Alterar"   // Texto do botão "Alterar"
-                });
+                Object[] row = {
+                    rs.getInt("id_pet"),
+                    rs.getString("nome"),
+                    rs.getString("especie"),
+                    rs.getString("raca"),
+                    rs.getString("nascimento"),
+                    rs.getString("sexo"),
+                    rs.getString("cor")
+                };
+                tableModel.addRow(row);
             }
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this, "Erro ao carregar dados: " + e.getMessage());
+            JOptionPane.showMessageDialog(this, "Erro ao atualizar a tabela: " + e.getMessage());
         }
     }
 
 
-    private void navigateTo(String position) {;;;
-        int currentIndex = getCurrentIndexFromTable();
-        switch (position) {
-            case "first":
-                currentIndex = 0;
-                break;
-            case "previous":
-                if (currentIndex > 0) currentIndex--;
-                break;
-            case "next":
-                if (currentIndex < tableModel.getRowCount() - 1) currentIndex++;
-                break;
-            case "last":
-                currentIndex = tableModel.getRowCount() - 1;
-                break;
-        }
-        selectRow(currentIndex);
-    }
-    
-    private int getCurrentIndexFromTable() {
-        return table.getSelectedRow();  // Retorna o índice da linha selecionada
-    }
-    
-    private void selectRow(int index) {
-        if (index >= 0 && index < tableModel.getRowCount()) {
-            table.setRowSelectionInterval(index, index);  // Seleciona a linha especificada
+    private void navigateTo(String direction) {
+        int rowCount = table.getRowCount();
+        int currentRow = table.getSelectedRow();
+        if (rowCount > 0) {
+            switch (direction) {
+                case "first":
+                    table.setRowSelectionInterval(0, 0);
+                    break;
+                case "previous":
+                    if (currentRow > 0) {
+                        table.setRowSelectionInterval(currentRow - 1, currentRow - 1);
+                    }
+                    break;
+                case "next":
+                    if (currentRow < rowCount - 1) {
+                        table.setRowSelectionInterval(currentRow + 1, currentRow + 1);
+                    }
+                    break;
+                case "last":
+                    table.setRowSelectionInterval(rowCount - 1, rowCount - 1);
+                    break;
+            }
         }
     }
     
