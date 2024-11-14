@@ -69,7 +69,7 @@ public class PetCRUD extends JFrame {
         add(btnInserir);
 
         // Configuração da JTable com modelo
-        tableModel = new DefaultTableModel(new Object[]{"ID", "Nome", "Espécie", "Raça", "Nascimento", "Sexo", "Cor", "Excluir", "Alterar"}, 0);
+        tableModel = new DefaultTableModel(new Object[]{"ID", "Nome", "Espécie", "Raça", "Nascimento", "Sexo", "Cor"}, 0);
         table = new JTable(tableModel);
         table.setRowHeight(30); // Aumentando a altura das linhas para melhor legibilidade
         table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS); // Ajustar todas as colunas automaticamente
@@ -93,12 +93,6 @@ public class PetCRUD extends JFrame {
         
         // Desabilitar a edição ao clicar ou dar dois cliques
         table.setDefaultEditor(Object.class, null); // Impede edição das células
-        
-        // Adicionar renderizadores e editores de botão nas colunas de "Excluir" e "Alterar"
-        table.getColumn("Excluir").setCellRenderer(new ButtonRenderer("Excluir", table));
-        table.getColumn("Excluir").setCellEditor(new ButtonEditor(table, "Excluir", this)); // 'this' passa a instância de PetCRUD
-        table.getColumn("Alterar").setCellRenderer(new ButtonRenderer("Alterar", table));
-        table.getColumn("Alterar").setCellEditor(new ButtonEditor(table, "Alterar", this)); // 'this' passa a instância de PetCRUD
 
         // Botões de navegação
         btnPrimeiro = new JButton("Primeiro");
@@ -116,6 +110,8 @@ public class PetCRUD extends JFrame {
         btnUltimo = new JButton("Último");
         btnUltimo.setBounds(410, 270, 120, 30);
         add(btnUltimo);
+
+
 
         JLabel lblNome = new JLabel("Nome:");
         lblNome.setBounds(900, 55, 80, 25);  
@@ -190,50 +186,6 @@ public class PetCRUD extends JFrame {
         public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
             return this;
         }
-    }
-    
-    static class ButtonEditor extends DefaultCellEditor {
-        private String label;
-        private boolean isPushed;
-        private JButton button;
-        private JTable table;
-        private PetCRUD petCRUD; // Referência à instância de PetCRUD
-
-        public ButtonEditor(JTable table, String label, PetCRUD petCRUD) {
-            super(new JCheckBox());
-            this.table = table; // Passando a tabela
-            this.label = label;
-            this.petCRUD = petCRUD; // Armazenando a referência de PetCRUD
-            button = new JButton(label);
-            button.setOpaque(true);
-            button.addActionListener(e -> fireEditingStopped());
-        }
-
-        @Override
-        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
-            isPushed = true;
-            return button;
-        }
-
-        @Override
-        public Object getCellEditorValue() {
-            if (isPushed) {
-                int row = table.getSelectedRow();  // Obtemos o índice da linha selecionada
-                if (row >= 0) {  // Verifique se o índice da linha é válido
-                    int petId = (Integer) table.getValueAt(row, 0);  // Obtém o ID do pet a partir da primeira coluna
-                    if ("Excluir".equals(label)) {
-                        petCRUD.deletePet(petId);  // Chama a função deletePet passando o ID do pet
-                    } else if ("Alterar".equals(label)) {
-                        petCRUD.editPet(petId);  // Chama a função editPet passando o ID do pet
-                    }
-                } else {
-                    JOptionPane.showMessageDialog(petCRUD, "Nenhuma linha selecionada.");
-                }
-            }
-            isPushed = false;
-            return label;
-        }
-
     }
 
     
